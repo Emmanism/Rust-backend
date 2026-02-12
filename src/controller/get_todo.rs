@@ -5,7 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 
-use crate::types::{Db, Status, Todo, TodoResponse};
+use crate::types::{Db, Status, TodoResponse};
 
 pub async fn get_todo(Path(todo_id): Path<i64>, State(db): State<Db>) -> impl IntoResponse {
     let mut connection = db.lock().unwrap();

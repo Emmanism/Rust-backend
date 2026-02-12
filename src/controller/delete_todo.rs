@@ -5,7 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 
-use crate::types::{Db, Status, TodoResponse, UpdateTodoType};
+use crate::types::{Db};
 
 pub async fn delete_todo(Path(todo_id): Path<i64>, State(db): State<Db>) -> impl IntoResponse {
     let mut connection = db.lock().unwrap();
@@ -15,9 +15,9 @@ pub async fn delete_todo(Path(todo_id): Path<i64>, State(db): State<Db>) -> impl
     statement.bind((1, todo_id)).unwrap();
 
     if let Ok(sqlite::State::Row) = statement.next() {
-        let id = statement.read::<i64, _>("id").unwrap();
-        let task = statement.read::<String, _>("task").unwrap();
-        let status = statement.read::<String, _>("status").unwrap();
+      //  let id = statement.read::<i64, _>("id").unwrap();
+       // let task = statement.read::<String, _>("task").unwrap();
+       // let status = statement.read::<String, _>("status").unwrap();
 
         let mut statement = connection
             .prepare("DELETE FROM Todos where id = ?")

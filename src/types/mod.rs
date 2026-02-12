@@ -6,6 +6,14 @@ use sqlite::Connection;
 pub type Db = Arc<Mutex<Connection>>;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ApiResponse<T> {
+    pub success: bool,
+    pub message: String,
+    pub data: Option<T>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Todo {
     pub task: String,
 }

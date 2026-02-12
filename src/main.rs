@@ -9,13 +9,14 @@ use tower_http::cors::CorsLayer;
 use crate::{
     controller::{
         create_todo::create_todo, delete_todo::delete_todo, get_todo::get_todo,
-        get_todos::get_todos, update_todo::update_todo,
+        get_todos::get_todos, update_todo::update_todo, 
     },
     types::Db,
 };
 
 mod controller;
 mod types;
+mod middleware;
 
 #[tokio::main]
 async fn main() {
