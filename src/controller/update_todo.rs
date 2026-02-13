@@ -60,17 +60,45 @@ pub async fn update_todo(
 }
  */
 
- pub async fn update_todo(
+
+
+
+pub async fn update_todo(
     Path(todo_id): Path<i64>,
     State(db): State<Db>,
     Json(payload): Json<UpdateTodoType>,
 ) -> impl IntoResponse {
-     if payload.task.is_none() || payload.status.is_none() {
-        return error(
-            StatusCode::BAD_REQUEST,
-            "At least one of 'task' or 'status' must be provided",
-        );
-    }
+    let task: String = match payload.task {
+        Some(t) if !t.trim().is_empty() => t,
+        _ => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "Field 'task' is required",
+            )
+        }
+    };
+
+    let status_str = match payload.status {
+        Some(s) => s,
+        None => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "Field 'status' is required",
+            )
+        }
+    };
+
+
+    let status = match status_str.as_str() {
+        "PENDING" | "DONE" => Status::from_str(&status_str),
+        _ => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "Invalid status. Allowed values: PENDING, DONE",
+            )
+        }
+    };
+
 
     let mut connection = match db.lock() {
         Ok(conn) => conn,
@@ -82,10 +110,9 @@ pub async fn update_todo(
         }
     };
 
-     let query = "SELECT id, task, status FROM todos WHERE id = ?";
 
     let mut select_stmt = match connection.prepare(
-        query,
+        "SELECT id FROM todos WHERE id = ?",
     ) {
         Ok(stmt) => stmt,
         Err(_) => {
@@ -97,21 +124,15 @@ pub async fn update_todo(
     };
 
     if select_stmt.bind((1, todo_id)).is_err() {
-        return error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to bind todo id");
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to bind todo id",
+        );
     }
 
-    let (current_task, current_status) = match select_stmt.next() {
-        Ok(sqlite::State::Row) => {
-            let task = select_stmt
-                .read::<String, _>("task")
-                .unwrap_or_default();
+    match select_stmt.next() {
+        Ok(sqlite::State::Row) => {}
 
-            let status = select_stmt
-                .read::<String, _>("status")
-                .unwrap_or("PENDING".to_string());
-
-            (task, status)
-        }
         Ok(sqlite::State::Done) => {
             return error(StatusCode::NOT_FOUND, "Todo not found");
         }
@@ -121,12 +142,7 @@ pub async fn update_todo(
                 "Failed to execute select query",
             )
         }
-    };
-
-
-    let updated_task = payload.task.unwrap_or(current_task);
-    let updated_status = payload.status.unwrap_or(current_status);
-
+    }
 
     let mut update_stmt = match connection.prepare(
         "UPDATE todos SET task = ?, status = ? WHERE id = ?",
@@ -140,12 +156,8 @@ pub async fn update_todo(
         }
     };
 
-    if update_stmt
-        .bind((1, updated_task.as_str()))
-        .is_err()
-        || update_stmt
-            .bind((2, updated_status.as_str()))
-            .is_err()
+    if update_stmt.bind((1, task.as_str())).is_err()
+        || update_stmt.bind((2, status.as_str())).is_err()
         || update_stmt.bind((3, todo_id)).is_err()
         || update_stmt.next().is_err()
     {
@@ -155,14 +167,13 @@ pub async fn update_todo(
         );
     }
 
-  
     success(
         StatusCode::OK,
         "Todo updated successfully",
         Some(TodoResponse {
             id: todo_id,
-            task: updated_task,
-            status: Status::from_str(&updated_status),
+            task,
+            status,
         }),
     )
 }

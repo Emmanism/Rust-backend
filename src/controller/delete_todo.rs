@@ -5,9 +5,13 @@ use axum::{
     response::IntoResponse,
 };
 
-use crate::types::{Db};
+use crate::{
+    middleware::api_response::{error, success},
+    types::Db,
+};
 
-pub async fn delete_todo(Path(todo_id): Path<i64>, State(db): State<Db>) -> impl IntoResponse {
+
+/* pub async fn delete_todo(Path(todo_id): Path<i64>, State(db): State<Db>) -> impl IntoResponse {
     let mut connection = db.lock().unwrap();
 
     let query = "SELECT * FROM Todos where id = ?";
@@ -15,10 +19,6 @@ pub async fn delete_todo(Path(todo_id): Path<i64>, State(db): State<Db>) -> impl
     statement.bind((1, todo_id)).unwrap();
 
     if let Ok(sqlite::State::Row) = statement.next() {
-      //  let id = statement.read::<i64, _>("id").unwrap();
-       // let task = statement.read::<String, _>("task").unwrap();
-       // let status = statement.read::<String, _>("status").unwrap();
-
         let mut statement = connection
             .prepare("DELETE FROM Todos where id = ?")
             .unwrap();
@@ -36,5 +36,83 @@ pub async fn delete_todo(Path(todo_id): Path<i64>, State(db): State<Db>) -> impl
             Json(serde_json::json!({"message": "No todo found with that todo id"})),
         )
             .into_response()
+    }
+}
+ */
+
+
+
+ pub async fn delete_todo(
+    Path(todo_id): Path<i64>,
+    State(db): State<Db>,
+) -> impl IntoResponse {
+    let mut connection = match db.lock() {
+        Ok(conn) => conn,
+        Err(_) => {
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to acquire database lock",
+            )
+        }
+    };
+    let mut select_stmt = match connection.prepare(
+        "SELECT id FROM todos WHERE id = ?",
+    ) {
+        Ok(stmt) => stmt,
+        Err(_) => {
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to prepare select query",
+            )
+        }
+    };
+
+    if select_stmt.bind((1, todo_id)).is_err() {
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to bind todo id",
+        );
+    }
+
+    match select_stmt.next() {
+        Ok(sqlite::State::Row) => {
+            let mut delete_stmt = match connection.prepare(
+                "DELETE FROM todos WHERE id = ?",
+            ) {
+                Ok(stmt) => stmt,
+                Err(_) => {
+                    return error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to prepare delete query",
+                    )
+                }
+            };
+
+            if delete_stmt.bind((1, todo_id)).is_err()
+                || delete_stmt.next().is_err()
+            {
+                return error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to delete todo",
+                );
+            }
+
+            success::<()>(
+                StatusCode::OK,
+                "Todo deleted successfully",
+                None,
+            )
+        }
+
+        Ok(sqlite::State::Done) => {
+            error(StatusCode::NOT_FOUND, "Todo not found")
+        }
+
+        Err(_) => {
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to execute select query",
+            )
+        }
     }
 }
