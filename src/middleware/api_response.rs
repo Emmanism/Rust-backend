@@ -1,9 +1,13 @@
-use axum::{http::StatusCode, Json};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
 use serde::Serialize;
 use crate::types::ApiResponse; 
 
 
-pub fn success<T: Serialize>(
+/* pub fn success<T: Serialize>(
     status: StatusCode,
     message: &str,
     data: Option<T>,
@@ -16,9 +20,25 @@ pub fn success<T: Serialize>(
             data,
         }),
     )
+} */
+
+pub fn success<T: Serialize>(
+    status: StatusCode,
+    message: &str,
+    data: Option<T>,
+) -> Response {
+    (
+        status,
+        Json(ApiResponse {
+            success: true,
+            message: message.to_string(),
+            data,
+        }),
+    )
+        .into_response()
 }
 
-pub fn error(
+/* pub fn error(
     status: StatusCode,
     message: &str,
 ) -> (StatusCode, Json<ApiResponse<()>>) {
@@ -30,4 +50,19 @@ pub fn error(
             data: None,
         }),
     )
+} */
+
+pub fn error(
+    status: StatusCode,
+    message: &str,
+) -> Response {
+    (
+        status,
+        Json(ApiResponse::<()> {
+            success: false,
+            message: message.to_string(),
+            data: None,
+        }),
+    )
+        .into_response()
 }
